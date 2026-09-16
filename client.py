@@ -619,7 +619,7 @@ def draw(stdscr, state, input_buf, cursor, now, frame):
         draw_matrix(stdscr, state, top + 1, chat_x + 1, main_h - 2, chat_w - 2, now)
 
     # --- en-tête animé
-    title = "chat-tui"
+    title = "webway"
     put_rainbow(stdscr, 0, 1, title, offset=frame * 0.35)
     info = f" ▸ {username}@{host}:{port} "
     put(stdscr, 0, 1 + len(title), info, curses.color_pair(HEADER_PAIR) | curses.A_BOLD)

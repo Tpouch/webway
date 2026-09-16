@@ -1,4 +1,4 @@
-# chat-tui
+# webway
 
 Un chat de terminal sur TCP/IP, avec une TUI curses **animée** : écran d'accueil, particules,
 pluie Matrix, indicateurs de frappe en direct, réactions et thèmes de couleurs.
