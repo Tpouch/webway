@@ -31,4 +31,7 @@ Both scripts create a `.venv`, install dependencies from `requirements.txt`, and
 ## Controls
 
 - Type to write a message, `Enter` to send.
+- `Ctrl+K` to cycle your display color (visible to everyone).
+- `Page Up` / `Page Down` to scroll through chat history.
+- `F1` to toggle the shortcuts help panel.
 - `Ctrl+C` to quit.

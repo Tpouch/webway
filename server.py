@@ -8,7 +8,12 @@ import time
 
 HOST = "0.0.0.0"
 LOCK = threading.Lock()
-CLIENTS = {}  # socket -> pseudo
+CLIENTS = {}  # socket -> {"name": pseudo, "hue": int 0-6}
+NUM_HUES = 7
+
+
+def default_hue(name):
+    return sum(ord(c) for c in name) % NUM_HUES
 
 
 def send_json(sock, payload):
@@ -27,7 +32,7 @@ def broadcast(payload, exclude=None):
 
 def unique_username(name):
     with LOCK:
-        taken = set(CLIENTS.values())
+        taken = {info["name"] for info in CLIENTS.values()}
     if name not in taken:
         return name
     i = 2
@@ -38,8 +43,8 @@ def unique_username(name):
 
 def userlist_payload():
     with LOCK:
-        names = sorted(CLIENTS.values())
-    return {"type": "userlist", "users": names}
+        users = sorted(CLIENTS.values(), key=lambda info: info["name"])
+    return {"type": "userlist", "users": users}
 
 
 def handle_client(conn, addr):
@@ -54,7 +59,7 @@ def handle_client(conn, addr):
         username = unique_username(requested)
 
         with LOCK:
-            CLIENTS[conn] = username
+            CLIENTS[conn] = {"name": username, "hue": default_hue(username)}
 
         send_json(conn, {"type": "welcome", "username": username})
         broadcast({"type": "join", "username": username, "ts": time.time()})
@@ -68,10 +73,18 @@ def handle_client(conn, addr):
                 msg = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if msg.get("type") == "msg":
+            mtype = msg.get("type")
+            if mtype == "msg":
                 text = msg.get("text", "")
                 if text:
                     broadcast({"type": "msg", "username": username, "text": text, "ts": time.time()})
+            elif mtype == "color":
+                hue = msg.get("hue")
+                if isinstance(hue, int) and 0 <= hue < NUM_HUES:
+                    with LOCK:
+                        if conn in CLIENTS:
+                            CLIENTS[conn]["hue"] = hue
+                    broadcast(userlist_payload())
     except (ConnectionResetError, OSError):
         pass
     finally:
