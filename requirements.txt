@@ -1,0 +1,2 @@
+# Aucune dépendance externe pour l'instant (server.py et client.py utilisent uniquement la stdlib).
+# Ce fichier existe pour que run_server.sh / run_client.sh puissent installer de futures dépendances.
