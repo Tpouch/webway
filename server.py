@@ -83,11 +83,18 @@ def handle_client(conn, addr):
         conn.close()
 
 
+DEFAULT_PORT = 5555  # 5000/7000 sont pris par ControlCenter (AirPlay Receiver) sur macOS
+
+
 def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_PORT
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind((HOST, port))
+    try:
+        server.bind((HOST, port))
+    except OSError as e:
+        print(f"Impossible d'utiliser le port {port} ({e}). Choisis un autre port : python3 server.py <port>")
+        sys.exit(1)
     server.listen()
     print(f"Serveur en écoute sur {HOST}:{port} (Ctrl+C pour arrêter)")
 
