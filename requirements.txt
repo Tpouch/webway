@@ -2,4 +2,3 @@ aiohttp
 textual
 textual-image
 bcrypt
-pytest
