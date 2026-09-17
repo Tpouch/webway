@@ -7,6 +7,7 @@ import os
 
 from aiohttp import web
 
+from webway.server.appkeys import CHANNELS_KEY, DB_KEY, SESSIONS_KEY, UPLOAD_DIR_KEY
 from webway.server.auth import SessionStore
 from webway.server.channels import ChannelRegistry
 from webway.server.db import Database
@@ -19,10 +20,10 @@ UPLOAD_DIR = "uploads"
 
 def create_app(db_path: str = DEFAULT_DB_PATH, upload_dir: str = UPLOAD_DIR) -> web.Application:
     app = web.Application(client_max_size=20 * 1024 * 1024)
-    app["db"] = Database(db_path)
-    app["sessions"] = SessionStore()
-    app["channels"] = ChannelRegistry()
-    app["upload_dir"] = upload_dir
+    app[DB_KEY] = Database(db_path)
+    app[SESSIONS_KEY] = SessionStore()
+    app[CHANNELS_KEY] = ChannelRegistry()
+    app[UPLOAD_DIR_KEY] = upload_dir
     os.makedirs(upload_dir, exist_ok=True)
 
     app.router.add_get("/ws", websocket_handler)
@@ -32,7 +33,7 @@ def create_app(db_path: str = DEFAULT_DB_PATH, upload_dir: str = UPLOAD_DIR) -> 
 
 
 async def _on_cleanup(app: web.Application) -> None:
-    app["db"].close()
+    app[DB_KEY].close()
 
 
 def main() -> None:

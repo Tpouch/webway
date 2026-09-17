@@ -6,6 +6,7 @@ import time
 
 from aiohttp import web
 
+from webway.server.appkeys import CHANNELS_KEY, DB_KEY, SESSIONS_KEY
 from webway.server.auth import AuthError, authenticate
 from webway.shared import protocol as p
 
@@ -47,9 +48,9 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     ws = web.WebSocketResponse()
     await ws.prepare(request)
 
-    db = request.app["db"]
-    sessions = request.app["sessions"]
-    channels = request.app["channels"]
+    db = request.app[DB_KEY]
+    sessions = request.app[SESSIONS_KEY]
+    channels = request.app[CHANNELS_KEY]
 
     user_id: int | None = None
     username: str | None = None
