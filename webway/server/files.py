@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import os
+import re
 import uuid
+from urllib.parse import quote
 
 from aiohttp import web
 
@@ -47,16 +49,26 @@ async def handle_upload(request: web.Request) -> web.Response:
     return web.json_response({"file_id": file_id, "url": f"/files/{file_id}"})
 
 
+def _safe_filename(name: str) -> str:
+    cleaned = re.sub(r'[\r\n\x00-\x1f"]', "", name).strip()
+    return cleaned or "download"
+
+
 async def handle_download(request: web.Request) -> web.StreamResponse:
     file_id = request.match_info["file_id"]
     db = request.app[DB_KEY]
     row = await db.get_file(file_id)
     if row is None:
         return web.json_response({"reason": "no_such_file"}, status=404)
+    safe_name = _safe_filename(row["filename"])
+    encoded_name = quote(safe_name, safe="")
     return web.FileResponse(
         path=row["path"],
         headers={
-            "Content-Type": row["mime"] or "application/octet-stream",
-            "Content-Disposition": f'inline; filename="{row["filename"]}"',
+            "Content-Type": "application/octet-stream",
+            "Content-Disposition": (
+                f'attachment; filename="{safe_name}"; filename*=UTF-8\'\'{encoded_name}'
+            ),
+            "X-Content-Type-Options": "nosniff",
         },
     )

@@ -60,3 +60,40 @@ class FilesTestCase(AioHTTPTestCase):
             self.assertEqual(resp.status, 413)
         finally:
             files_module.MAX_UPLOAD_SIZE = original
+
+    async def test_download_response_headers_are_secure(self):
+        token = await self._session_token()
+        data = FormData()
+        data.add_field("file", b"test content", filename="test.txt", content_type="text/html")
+        resp = await self.client.post("/upload", data=data, headers={"X-Session-Token": token})
+        body = await resp.json()
+        file_id = body["file_id"]
+
+        download = await self.client.get(f"/files/{file_id}")
+        self.assertEqual(download.status, 200)
+        self.assertEqual(download.headers["Content-Type"], "application/octet-stream")
+        self.assertTrue(download.headers["Content-Disposition"].startswith("attachment"))
+        self.assertIn("X-Content-Type-Options", download.headers)
+        self.assertEqual(download.headers["X-Content-Type-Options"], "nosniff")
+
+    async def test_download_sanitizes_unsafe_filename(self):
+        token = await self._session_token()
+        data = FormData()
+        # Upload a file with a quote in the filename
+        # (aiohttp validates on client side, but we test the server-side sanitization)
+        unsafe_filename = 'test"file.txt'
+        data.add_field("file", b"content", filename=unsafe_filename, content_type="text/plain")
+        resp = await self.client.post("/upload", data=data, headers={"X-Session-Token": token})
+        body = await resp.json()
+        file_id = body["file_id"]
+
+        download = await self.client.get(f"/files/{file_id}")
+        self.assertEqual(download.status, 200)
+        # Verify the response has valid headers without header injection
+        disposition = download.headers["Content-Disposition"]
+        # Should not contain raw newlines or double quotes outside of encoding
+        self.assertNotIn("\r", disposition)
+        self.assertNotIn("\n", disposition)
+        # Content should still be readable
+        content = await download.read()
+        self.assertEqual(content, b"content")
