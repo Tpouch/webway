@@ -11,6 +11,7 @@ from webway.server.appkeys import CHANNELS_KEY, DB_KEY, SESSIONS_KEY, UPLOAD_DIR
 from webway.server.auth import SessionStore
 from webway.server.channels import ChannelRegistry
 from webway.server.db import Database
+from webway.server.files import handle_download, handle_upload
 from webway.server.ws_protocol import websocket_handler
 
 DEFAULT_PORT = 5555
@@ -27,6 +28,8 @@ def create_app(db_path: str = DEFAULT_DB_PATH, upload_dir: str = UPLOAD_DIR) -> 
     os.makedirs(upload_dir, exist_ok=True)
 
     app.router.add_get("/ws", websocket_handler)
+    app.router.add_post("/upload", handle_upload)
+    app.router.add_get("/files/{file_id}", handle_download)
 
     app.on_cleanup.append(_on_cleanup)
     return app
