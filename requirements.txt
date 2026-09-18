@@ -1,4 +1,12 @@
-aiohttp
-textual
-textual-image
-bcrypt
+# Pinned to a floor of the versions this branch was developed and tested against,
+# with a ceiling at the next breaking release. run_server.sh / run_client.sh
+# reinstall from this file on every launch, so an unpinned upstream release could
+# otherwise silently change behaviour the code depends on.
+aiohttp>=3.14.3,<4
+# textual: chat_log.py's Rich-markup-injection defense relies on Static.content
+# returning the raw escaped markup source.
+textual>=8.2.8,<9
+# textual-image: widget.Image's on_error parameter. 0.x, so the minor version is
+# the breaking one - hold the ceiling at the next minor.
+textual-image>=0.14.0,<0.15
+bcrypt>=5.0.0,<6
