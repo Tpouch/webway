@@ -74,12 +74,14 @@ def test_listen_reconnects_when_message_stream_ends():
                 self.sent.append(payload)
 
             async def messages(self):
-                if False:
-                    yield {}
+                await asyncio.Event().wait()  # never set — blocks forever, representing an open connection with no messages
+                yield {}  # pragma: no cover (unreachable; keeps this an async generator)
 
         class Harness(App):
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(EndsImmediately(), "alice"))
+                # Set current_channel_id on the pushed screen
+                self.screen.current_channel_id = 5
 
             async def reconnect(self):
                 reconnect_calls.append(1)
@@ -90,7 +92,6 @@ def test_listen_reconnects_when_message_stream_ends():
         app = Harness()
         async with app.run_test() as pilot:
             screen = app.screen
-            screen.current_channel_id = 5
             await pilot.pause()
             await pilot.pause()
             await pilot.pause()

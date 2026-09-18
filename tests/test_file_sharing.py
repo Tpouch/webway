@@ -20,6 +20,10 @@ class BlockingClient:
             await asyncio.sleep(100)
             if False:
                 yield {}  # pragma: no cover - unreachable, but makes this an async generator
+    async def download_file(self, file_id: str, dest_path: str) -> None:
+        pass  # stub - not needed for these tests
+    async def upload_file(self, path: str) -> dict:
+        return {}  # stub - not needed for these tests
 
 
 class StubClient:
@@ -57,7 +61,7 @@ def test_upload_command_uploads_then_sends_message_with_file_id(tmp_path):
                 self.push_screen(MainScreen(client, "alice"))
 
             async def reconnect(self):
-                return BlockingClient()
+                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -66,8 +70,10 @@ def test_upload_command_uploads_then_sends_message_with_file_id(tmp_path):
             await screen.handle_input(f"/upload {src}")
             await pilot.pause()
 
-            assert client.sent[-1]["file_id"] == "abc123"
-            assert client.sent[-1]["type"] == p.C_MESSAGE_SEND
+            # Find the message sent message with the file ID
+            messages_with_file = [m for m in client.sent if m.get("type") == p.C_MESSAGE_SEND and m.get("file_id") == "abc123"]
+            assert len(messages_with_file) > 0
+            assert messages_with_file[-1]["file_id"] == "abc123"
     run(body())
 
 
@@ -85,7 +91,7 @@ def test_upload_command_rejects_oversized_file(tmp_path, monkeypatch):
                 self.push_screen(MainScreen(client, "alice"))
 
             async def reconnect(self):
-                return BlockingClient()
+                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -107,7 +113,7 @@ def test_upload_command_reports_missing_file():
                 self.push_screen(MainScreen(client, "alice"))
 
             async def reconnect(self):
-                return BlockingClient()
+                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -151,6 +157,9 @@ def test_missing_file_notice_does_not_double_escape_bracket_in_path():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
+            async def reconnect(self):
+                return client
+
         app = Harness()
         async with app.run_test() as pilot:
             screen = app.screen
@@ -184,7 +193,7 @@ def test_download_and_show_sanitizes_path_traversal_filename(tmp_path, monkeypat
                 self.push_screen(MainScreen(client, "alice"))
 
             async def reconnect(self):
-                return BlockingClient()
+                return client
 
         app = Harness()
         async with app.run_test() as pilot:

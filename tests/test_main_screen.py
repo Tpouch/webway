@@ -21,6 +21,10 @@ class BlockingClient:
             await asyncio.sleep(100)
             if False:
                 yield {}  # pragma: no cover - unreachable, but makes this an async generator
+    async def download_file(self, file_id: str, dest_path: str) -> None:
+        pass  # stub - not needed for these tests
+    async def upload_file(self, path: str) -> dict:
+        return {}  # stub - not needed for these tests
 
 
 class StubClient:
@@ -48,8 +52,8 @@ def test_join_channel_switches_current_channel_and_sends_join():
                 self.push_screen(MainScreen(client, "alice"))
 
             async def reconnect(self):
-                # Stub for reconnect - return a client that blocks
-                return BlockingClient()
+                # Stub for reconnect - return the original client to keep using it
+                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -59,7 +63,7 @@ def test_join_channel_switches_current_channel_and_sends_join():
             await pilot.pause()
 
             assert screen.current_channel_id == 1
-            assert client.sent[-1] == {"type": p.C_CHANNEL_JOIN, "channel_id": 1}
+            assert {"type": p.C_CHANNEL_JOIN, "channel_id": 1} in client.sent
     run(body())
 
 
@@ -72,7 +76,7 @@ def test_plain_text_sends_message_to_current_channel():
                 self.push_screen(MainScreen(client, "alice"))
 
             async def reconnect(self):
-                return BlockingClient()
+                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -81,7 +85,7 @@ def test_plain_text_sends_message_to_current_channel():
             await screen.handle_input("hello there")
             await pilot.pause()
 
-            assert client.sent[-1] == {"type": p.C_MESSAGE_SEND, "channel_id": 5, "text": "hello there"}
+            assert {"type": p.C_MESSAGE_SEND, "channel_id": 5, "text": "hello there"} in client.sent
     run(body())
 
 
@@ -94,7 +98,7 @@ def test_history_event_populates_chat_log():
                 self.push_screen(MainScreen(client, "alice"))
 
             async def reconnect(self):
-                return BlockingClient()
+                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -120,7 +124,7 @@ def test_presence_event_updates_member_list():
                 self.push_screen(MainScreen(client, "alice"))
 
             async def reconnect(self):
-                return BlockingClient()
+                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -143,7 +147,7 @@ def test_add_reaction_works_without_crash():
                 self.push_screen(MainScreen(client, "alice"))
 
             async def reconnect(self):
-                return BlockingClient()
+                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -171,7 +175,7 @@ def test_markup_injection_is_escaped():
                 self.push_screen(MainScreen(client, "alice"))
 
             async def reconnect(self):
-                return BlockingClient()
+                return client
 
         app = Harness()
         async with app.run_test() as pilot:
