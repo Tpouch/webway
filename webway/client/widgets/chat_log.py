@@ -37,10 +37,13 @@ class ChatLog(VerticalScroll):
         return line
 
     def mount_image(self, message_id: int, path: str) -> None:
+        def fallback(exc: Exception) -> Static:
+            return Static(f"(could not render image: {markup_escape(path)})")
+
         try:
-            widget = Image(path)
+            widget = Image(path, on_error=fallback)
         except Exception:
-            widget = Static(f"(could not render image: {markup_escape(path)})")
+            widget = fallback(None)
         self.mount(widget)
         self.scroll_end(animate=False)
 

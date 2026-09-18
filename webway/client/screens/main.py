@@ -104,6 +104,12 @@ class MainScreen(Screen):
                 })
                 return
             result = await self.client.upload_file(path)
+            if "file_id" not in result:
+                self.query_one(ChatLog).add_message({
+                    "id": -1, "username": "system", "message_type": "msg",
+                    "text": f"upload failed: {result.get('reason', 'unknown error')}", "file": None,
+                })
+                return
             await self.client.send({
                 "type": p.C_MESSAGE_SEND, "channel_id": self.current_channel_id,
                 "text": os.path.basename(path), "file_id": result["file_id"],
@@ -119,7 +125,8 @@ class MainScreen(Screen):
 
     async def _download_and_show(self, message_id: int, file_meta: dict) -> None:
         os.makedirs(CACHE_DIR, exist_ok=True)
-        cache_path = os.path.join(CACHE_DIR, f"{file_meta['id']}_{file_meta['filename']}")
+        safe_filename = os.path.basename(file_meta["filename"])
+        cache_path = os.path.join(CACHE_DIR, f"{file_meta['id']}_{safe_filename}")
         if not os.path.exists(cache_path):
             await self.client.download_file(file_meta["id"], cache_path)
         self.query_one(ChatLog).mount_image(message_id, cache_path)

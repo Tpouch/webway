@@ -1,5 +1,6 @@
 """Tests for the /upload command and inline-image fallback behavior."""
 import asyncio
+import os
 
 from textual.app import App
 
@@ -146,6 +147,37 @@ def test_missing_file_notice_does_not_double_escape_bracket_in_path():
             # once Rich renders the markup.
             assert "weird\\[name].png" in widget.content
             assert "\\\\[" not in widget.content
+    run(body())
+
+
+def test_download_and_show_sanitizes_path_traversal_filename(tmp_path, monkeypatch):
+    async def body():
+        import webway.client.screens.main as main_module
+
+        monkeypatch.setattr(main_module, "CACHE_DIR", str(tmp_path))
+        client = StubClient()
+
+        class Harness(App):
+            def on_mount(self) -> None:
+                self.push_screen(MainScreen(client, "alice"))
+
+        app = Harness()
+        async with app.run_test() as pilot:
+            screen = app.screen
+            for malicious_filename in ("../../../etc/passwd", "/etc/passwd"):
+                file_meta = {"id": "fid1", "filename": malicious_filename, "mime": "image/png"}
+                await screen._download_and_show(1, file_meta)
+                await pilot.pause()
+
+                # The written file must be a plain filename directly inside CACHE_DIR:
+                # no path-traversal or absolute-path component from the (attacker-
+                # controlled) filename may reach the filesystem call.
+                entries = os.listdir(tmp_path)
+                assert entries == ["fid1_passwd"], entries
+                cache_path = os.path.join(str(tmp_path), entries[0])
+                assert os.path.commonpath([str(tmp_path), os.path.abspath(cache_path)]) == str(tmp_path)
+
+                os.remove(cache_path)
     run(body())
 
 
