@@ -2632,3 +2632,104 @@ Replace the curses/single-room description with: how to run the server and clien
 git add README.md
 git commit -m "docs: rewrite README for the Textual multi-channel client"
 ```
+
+---
+
+### Task 14: Add /create channel command (gap fill)
+
+> Added after Task 13 during final verification: the server has always fully implemented `channel.create` (Task 5), but no task ever wired a client-side command to trigger it — `MainScreen.handle_input` only recognized `/join` and `/upload`. This closes that gap against the spec's core goal of user-creatable channels.
+
+**Files:**
+- Modify: `webway/client/screens/main.py`
+- Modify: `README.md`
+- Test: `tests/test_main_screen.py`
+
+**Interfaces:**
+- Consumes: `webway.shared.protocol.C_CHANNEL_CREATE` (Task 1), `MainScreen.handle_input` (Task 10/11, extending it further).
+- Produces: `handle_input` recognizes `/create <name> [topic...]`, sending `{"type": p.C_CHANNEL_CREATE, "name": name, "topic": topic}` (topic defaults to `""` if omitted). No new interface beyond this — the server already broadcasts `channel.created` globally (Task 5) and `MainScreen._handle_event`'s existing `S_CHANNEL_CREATED` branch (Task 10) already adds it to `ChannelList`, so no other client-side wiring is needed.
+
+- [ ] **Step 1: Write the failing tests**
+
+```python
+# tests/test_main_screen.py — add these two tests
+def test_create_channel_sends_channel_create_with_topic():
+    async def body():
+        client = StubClient()
+
+        class Harness(App):
+            def on_mount(self) -> None:
+                self.push_screen(MainScreen(client, "alice"))
+
+        app = Harness()
+        async with app.run_test() as pilot:
+            screen = app.screen
+            await screen.handle_input("/create general a place to chat")
+            await pilot.pause()
+
+            assert client.sent[-1] == {
+                "type": p.C_CHANNEL_CREATE, "name": "general", "topic": "a place to chat",
+            }
+    run(body())
+
+
+def test_create_channel_without_topic_defaults_empty():
+    async def body():
+        client = StubClient()
+
+        class Harness(App):
+            def on_mount(self) -> None:
+                self.push_screen(MainScreen(client, "alice"))
+
+        app = Harness()
+        async with app.run_test() as pilot:
+            screen = app.screen
+            await screen.handle_input("/create random")
+            await pilot.pause()
+
+            assert client.sent[-1] == {"type": p.C_CHANNEL_CREATE, "name": "random", "topic": ""}
+    run(body())
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `python3 -m pytest tests/test_main_screen.py -v`
+Expected: FAIL — `/create` currently falls through to a plain `message.send` (or is silently dropped if no channel is joined yet), not a `channel.create` frame.
+
+- [ ] **Step 3: Add the /create branch to handle_input**
+
+```python
+# webway/client/screens/main.py — modify handle_input, insert this branch
+# right after the existing "/join " branch, BEFORE the
+# "if self.current_channel_id is None: return" guard (creating a channel
+# must not require already being in one):
+        if text.startswith("/create "):
+            rest = text[len("/create "):].strip()
+            if not rest:
+                return
+            parts = rest.split(maxsplit=1)
+            name = parts[0]
+            topic = parts[1] if len(parts) > 1 else ""
+            await self.client.send({"type": p.C_CHANNEL_CREATE, "name": name, "topic": topic})
+            return
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `python3 -m pytest tests/test_main_screen.py -v`
+Expected: PASS (all tests, including the two new ones)
+
+- [ ] **Step 5: Update README.md**
+
+Add a line documenting `/create <name> [topic]` alongside the existing `/join`/`/upload` command documentation, matching the README's existing style and correcting the earlier vague "channel creation happens via the UI" phrasing from Task 13 with the actual command.
+
+- [ ] **Step 6: Run the full test suite**
+
+Run: `python3 -m pytest tests/ -v`
+Expected: PASS (all tests)
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add webway/client/screens/main.py tests/test_main_screen.py README.md
+git commit -m "feat: add /create command for user-creatable channels"
+```
