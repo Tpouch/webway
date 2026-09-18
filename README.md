@@ -44,7 +44,6 @@ Use the `/join` command to switch to an existing channel:
 /join random
 ```
 
-The channel list appears in the left sidebar. Click or use `/join` to switch channels.
 
 ### Sharing Files
 
@@ -55,22 +54,20 @@ Use the `/upload` command to share a file with the current channel:
 /upload ~/Pictures/screenshot.png
 ```
 
-**Image handling:** Images (JPG, PNG, GIF, etc.) automatically render inline in the chat on terminals with graphics protocol support (via `textual-image`). On terminals without graphics support, images display as a text notice with a download link.
+**Image handling:** Images (JPG, PNG, GIF, etc.) automatically render inline in the chat on terminals with graphics protocol support (via `textual-image`). On terminals without graphics support, images display as a text notice like `(could not render image: <path>)`. Regular file attachments display as `(file: <filename>)`.
 
 **File size limit:** 15 MB per file.
 
 ## Architecture
 
 - **Server:** aiohttp-based WebSocket server with SQLite persistence. Handles authentication, channel management, message history, file uploads, and presence tracking.
-- **Client:** Textual TUI application. Displays channels, chat messages, member list, and supports real-time typing indicators and reactions.
+- **Client:** Textual TUI application. Displays channels, chat messages, and member list.
 - **Protocol:** JSON-based WebSocket protocol for client-server communication.
 
 ## Feature Summary
 
-- **Multi-channel chat:** Create and join multiple channels.
+- **Multi-channel chat:** Join multiple channels using `/join <name>`.
 - **Accounts:** Username/password authentication. First login with a username creates the account.
 - **Presence:** See who's online in each channel.
-- **File sharing:** Upload and download files; images render inline when supported.
+- **File sharing:** Share files via `/upload <path>`; images render inline automatically on supported terminals.
 - **Message history:** 50 recent messages per channel are replayed when you join.
-- **Typing indicators:** See when others are typing.
-- **Reactions:** Add emoji reactions to messages.
