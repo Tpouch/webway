@@ -55,6 +55,7 @@ Use the `/create` command to create a new channel:
 
 The channel name is required; the topic is optional and defaults to empty.
 
+
 ### Sharing Files
 
 Use the `/upload` command to share a file with the current channel:

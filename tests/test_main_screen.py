@@ -166,6 +166,7 @@ def test_markup_injection_is_escaped():
             # The escaped markup should appear as literal text, not be interpreted
             assert r"\[bold]" in widget.content
             assert r"\[link=" in widget.content
+    run(body())
 
 
 def test_create_channel_sends_channel_create_with_topic():
