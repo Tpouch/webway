@@ -106,3 +106,58 @@ def test_presence_event_updates_member_list():
             members = [child.children[0].content for child in screen.query_one(MemberList).children]
             assert [str(m) for m in members] == ["alice", "bob"]
     run(body())
+
+
+def test_add_reaction_works_without_crash():
+    async def body():
+        client = StubClient()
+
+        class Harness(App):
+            def on_mount(self) -> None:
+                self.push_screen(MainScreen(client, "alice"))
+
+        app = Harness()
+        async with app.run_test() as pilot:
+            screen = app.screen
+            chat_log = screen.query_one(ChatLog)
+            # Add a message first
+            chat_log.add_message({"id": 1, "username": "bob", "message_type": "msg", "text": "hello", "file": None})
+            # Then add a reaction
+            chat_log.add_reaction(1, "👍", "alice")
+            await pilot.pause()
+
+            # Verify the reaction was added to the widget content
+            widget = chat_log._message_widgets.get(1)
+            assert widget is not None
+            assert "👍" in widget.content
+    run(body())
+
+
+def test_markup_injection_is_escaped():
+    async def body():
+        client = StubClient()
+
+        class Harness(App):
+            def on_mount(self) -> None:
+                self.push_screen(MainScreen(client, "alice"))
+
+        app = Harness()
+        async with app.run_test() as pilot:
+            screen = app.screen
+            chat_log = screen.query_one(ChatLog)
+            # Add a message with markup characters
+            chat_log.add_message({
+                "id": 1,
+                "username": "[bold]hacker[/bold]",
+                "message_type": "msg",
+                "text": "[link=file:///etc/passwd]click[/link]",
+                "file": None
+            })
+            await pilot.pause()
+
+            widget = chat_log._message_widgets.get(1)
+            assert widget is not None
+            # The escaped markup should appear as literal text, not be interpreted
+            assert r"\[bold]" in widget.content
+            assert r"\[link=" in widget.content
+    run(body())

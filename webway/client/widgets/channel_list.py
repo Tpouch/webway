@@ -1,6 +1,7 @@
 """Sidebar widget listing available channels."""
 from __future__ import annotations
 
+from rich.markup import escape as markup_escape
 from textual.widgets import Label, ListItem, ListView
 
 
@@ -17,7 +18,8 @@ class ChannelList(ListView):
 
     def add_channel(self, channel_id: int, name: str) -> None:
         self._id_by_name[name] = channel_id
-        self.append(ListItem(Label(f"# {name}")))
+        self.append(ListItem(Label(f"# {markup_escape(name)}")))
+
 
     def id_for_name(self, name: str) -> int | None:
         return self._id_by_name.get(name)

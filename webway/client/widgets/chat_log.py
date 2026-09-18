@@ -1,6 +1,7 @@
 """Scrollable chat log rendering messages, reactions, and typing state."""
 from __future__ import annotations
 
+from rich.markup import escape as markup_escape
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 
@@ -28,16 +29,16 @@ class ChatLog(VerticalScroll):
         self.scroll_end(animate=False)
 
     def _render_line(self, message: dict) -> str:
-        prefix = "* " if message.get("message_type") == "action" else f"{message['username']}: "
-        line = f"{prefix}{message['text']}"
+        prefix = "* " if message.get("message_type") == "action" else f"{markup_escape(message['username'])}: "
+        line = f"{prefix}{markup_escape(message['text'])}"
         if message.get("file"):
-            line += f"  [file: {message['file']['filename']}]"
+            line += f"  [file: {markup_escape(message['file']['filename'])}]"
         return line
 
     def add_reaction(self, message_id: int, emoji: str, username: str) -> None:
         widget = self._message_widgets.get(message_id)
         if widget is not None:
-            widget.update(f"{widget.renderable}  {emoji}")
+            widget.update(f"{widget.content}  {markup_escape(emoji)}")
 
     def set_typing(self, username: str, state: bool) -> None:
         if state:
