@@ -10,23 +10,6 @@ from webway.client.widgets.member_list import MemberList
 from webway.shared import protocol as p
 
 
-class BlockingClient:
-    """Mock client with blocking message stream to prevent reconnect loop."""
-    async def send(self, payload):
-        pass
-    async def messages(self):
-        # Never yield - block indefinitely waiting for an event that never comes
-        # This makes it an async generator that never yields
-        while True:
-            await asyncio.sleep(100)
-            if False:
-                yield {}  # pragma: no cover - unreachable, but makes this an async generator
-    async def download_file(self, file_id: str, dest_path: str) -> None:
-        pass  # stub - not needed for these tests
-    async def upload_file(self, path: str) -> dict:
-        return {}  # stub - not needed for these tests
-
-
 class StubClient:
     def __init__(self):
         self.sent: list[dict] = []
@@ -35,8 +18,8 @@ class StubClient:
         self.sent.append(payload)
 
     async def messages(self):
-        if False:
-            yield {}
+        await asyncio.Event().wait()  # never set — blocks forever, representing an open connection with no new messages
+        yield {}  # pragma: no cover (unreachable; keeps this an async generator)
 
 
 def run(coro):
@@ -51,9 +34,6 @@ def test_join_channel_switches_current_channel_and_sends_join():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
-            async def reconnect(self):
-                # Stub for reconnect - return the original client to keep using it
-                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -63,7 +43,7 @@ def test_join_channel_switches_current_channel_and_sends_join():
             await pilot.pause()
 
             assert screen.current_channel_id == 1
-            assert {"type": p.C_CHANNEL_JOIN, "channel_id": 1} in client.sent
+            assert client.sent[-1] == {"type": p.C_CHANNEL_JOIN, "channel_id": 1}
     run(body())
 
 
@@ -75,8 +55,6 @@ def test_plain_text_sends_message_to_current_channel():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
-            async def reconnect(self):
-                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -85,7 +63,7 @@ def test_plain_text_sends_message_to_current_channel():
             await screen.handle_input("hello there")
             await pilot.pause()
 
-            assert {"type": p.C_MESSAGE_SEND, "channel_id": 5, "text": "hello there"} in client.sent
+            assert client.sent[-1] == {"type": p.C_MESSAGE_SEND, "channel_id": 5, "text": "hello there"}
     run(body())
 
 
@@ -97,8 +75,6 @@ def test_history_event_populates_chat_log():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
-            async def reconnect(self):
-                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -123,8 +99,6 @@ def test_presence_event_updates_member_list():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
-            async def reconnect(self):
-                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -146,8 +120,6 @@ def test_add_reaction_works_without_crash():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
-            async def reconnect(self):
-                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -174,8 +146,6 @@ def test_markup_injection_is_escaped():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
-            async def reconnect(self):
-                return client
 
         app = Harness()
         async with app.run_test() as pilot:

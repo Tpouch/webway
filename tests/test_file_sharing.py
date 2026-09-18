@@ -9,23 +9,6 @@ from webway.client.widgets.chat_log import ChatLog
 from webway.shared import protocol as p
 
 
-class BlockingClient:
-    """Mock client with blocking message stream to prevent reconnect loop."""
-    async def send(self, payload):
-        pass
-    async def messages(self):
-        # Never yield - block indefinitely waiting for an event that never comes
-        # This makes it an async generator that never yields
-        while True:
-            await asyncio.sleep(100)
-            if False:
-                yield {}  # pragma: no cover - unreachable, but makes this an async generator
-    async def download_file(self, file_id: str, dest_path: str) -> None:
-        pass  # stub - not needed for these tests
-    async def upload_file(self, path: str) -> dict:
-        return {}  # stub - not needed for these tests
-
-
 class StubClient:
     def __init__(self):
         self.sent: list[dict] = []
@@ -35,8 +18,8 @@ class StubClient:
         self.sent.append(payload)
 
     async def messages(self):
-        if False:
-            yield {}
+        await asyncio.Event().wait()  # never set — blocks forever, representing an open connection with no new messages
+        yield {}  # pragma: no cover (unreachable; keeps this an async generator)
 
     async def upload_file(self, path: str) -> dict:
         return {"file_id": "abc123", "url": "/files/abc123"}
@@ -60,8 +43,6 @@ def test_upload_command_uploads_then_sends_message_with_file_id(tmp_path):
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
-            async def reconnect(self):
-                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -90,8 +71,6 @@ def test_upload_command_rejects_oversized_file(tmp_path, monkeypatch):
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
-            async def reconnect(self):
-                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -112,8 +91,6 @@ def test_upload_command_reports_missing_file():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
-            async def reconnect(self):
-                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -157,8 +134,6 @@ def test_missing_file_notice_does_not_double_escape_bracket_in_path():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
-            async def reconnect(self):
-                return client
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -192,8 +167,6 @@ def test_download_and_show_sanitizes_path_traversal_filename(tmp_path, monkeypat
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
-            async def reconnect(self):
-                return client
 
         app = Harness()
         async with app.run_test() as pilot:
