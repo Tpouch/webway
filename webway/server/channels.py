@@ -6,9 +6,12 @@ for broadcast and presence purposes.
 """
 from __future__ import annotations
 
+import logging
 from typing import Protocol
 
 from webway.shared.protocol import encode
+
+logger = logging.getLogger("webway.server.channels")
 
 
 class Connection(Protocol):
@@ -45,14 +48,27 @@ class ChannelRegistry:
     def connections(self, channel_id: int) -> list[Connection]:
         return list(self._subscribers.get(channel_id, {}).keys())
 
+    async def _send_isolated(self, ws: Connection, message: str) -> None:
+        """Send to one connection, swallowing any failure.
+
+        A connection can report ``closed is False`` and still raise from
+        ``send_str`` (mid-close, transport already reset). One such failure
+        must never abort the broadcast loop for the remaining subscribers,
+        nor propagate into whatever caller triggered the broadcast.
+        """
+        if ws.closed:
+            return
+        try:
+            await ws.send_str(message)
+        except Exception:
+            logger.warning("dropping broadcast to failed connection", exc_info=True)
+
     async def broadcast(self, channel_id: int, payload: dict) -> None:
         message = encode(payload)
         for ws in self.connections(channel_id):
-            if not ws.closed:
-                await ws.send_str(message)
+            await self._send_isolated(ws, message)
 
     async def broadcast_global(self, payload: dict) -> None:
         message = encode(payload)
         for ws in list(self._all_connections):
-            if not ws.closed:
-                await ws.send_str(message)
+            await self._send_isolated(ws, message)

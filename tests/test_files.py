@@ -1,4 +1,5 @@
 """Tests for the HTTP file upload/download endpoints."""
+import json
 import os
 import tempfile
 
@@ -18,12 +19,66 @@ class FilesTestCase(AioHTTPTestCase):
         upload_dir = os.path.join(self.tmpdir, "uploads")
         return create_app(db_path, upload_dir)
 
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        self._open_sockets = []
+
+    async def asyncTearDown(self) -> None:
+        for ws in self._open_sockets:
+            await ws.close()
+        await super().asyncTearDown()
+
     async def _session_token(self, username="alice"):
-        async with self.client.ws_connect("/ws") as ws:
-            await ws.send_str(p.encode({"type": p.C_AUTH, "username": username, "password": "pw"}))
-            import json
+        """Authenticate over a WebSocket and leave it open.
+
+        The server revokes a session token when its WebSocket disconnects, so
+        the connection has to outlive the HTTP requests using the token — which
+        is exactly what the real client does.
+        """
+        ws = await self.client.ws_connect("/ws")
+        self._open_sockets.append(ws)
+        await ws.send_str(p.encode({"type": p.C_AUTH, "username": username, "password": "pw"}))
+        reply = json.loads(await ws.receive_str())
+        return reply["session_token"]
+
+    async def test_uploaded_file_can_be_attached_to_a_message(self):
+        ws = await self.client.ws_connect("/ws")
+        self._open_sockets.append(ws)
+        await ws.send_str(p.encode({"type": p.C_AUTH, "username": "alice", "password": "pw"}))
+        token = json.loads(await ws.receive_str())["session_token"]
+        json.loads(await ws.receive_str())  # channel list
+
+        await ws.send_str(p.encode({"type": p.C_CHANNEL_CREATE, "name": "general", "topic": ""}))
+        channel_id = json.loads(await ws.receive_str())["id"]
+        await ws.send_str(p.encode({"type": p.C_CHANNEL_JOIN, "channel_id": channel_id}))
+        while json.loads(await ws.receive_str())["type"] != p.S_HISTORY:
+            pass
+
+        data = FormData()
+        data.add_field("file", b"hello", filename="hello.txt", content_type="text/plain")
+        resp = await self.client.post("/upload", data=data, headers={"X-Session-Token": token})
+        file_id = (await resp.json())["file_id"]
+
+        await ws.send_str(p.encode({
+            "type": p.C_MESSAGE_SEND, "channel_id": channel_id, "text": "hello.txt", "file_id": file_id,
+        }))
+        while True:
             reply = json.loads(await ws.receive_str())
-            return reply["session_token"]
+            if reply["type"] == p.S_MESSAGE:
+                break
+            self.assertNotEqual(reply["type"], p.S_ERROR, reply)
+        self.assertIsNotNone(reply["file"])
+        self.assertEqual(reply["file"]["filename"], "hello.txt")
+        self.assertEqual(reply["file"]["id"], file_id)
+
+    async def test_session_token_is_revoked_when_its_socket_disconnects(self):
+        async with self.client.ws_connect("/ws") as ws:
+            await ws.send_str(p.encode({"type": p.C_AUTH, "username": "zoe", "password": "pw"}))
+            token = json.loads(await ws.receive_str())["session_token"]
+        data = FormData()
+        data.add_field("file", b"hello", filename="hello.txt", content_type="text/plain")
+        resp = await self.client.post("/upload", data=data, headers={"X-Session-Token": token})
+        self.assertEqual(resp.status, 401)
 
     async def test_upload_without_token_is_rejected(self):
         data = FormData()
