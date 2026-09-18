@@ -3,6 +3,7 @@ import asyncio
 import os
 import tempfile
 
+import aiohttp
 from aiohttp.test_utils import TestClient, TestServer
 
 from webway.client.net import WebwayClient, backoff_delays
@@ -61,6 +62,57 @@ def test_upload_and_download_round_trip():
         finally:
             await client.close()
     asyncio.run(run())
+
+
+class _FakeMsg:
+    def __init__(self, msg_type, data=None):
+        self.type = msg_type
+        self.data = data
+
+
+class _FakeWS:
+    """Minimal stand-in for aiohttp's ClientWebSocketResponse."""
+
+    def __init__(self, msgs):
+        self._msgs = msgs
+
+    def __aiter__(self):
+        async def gen():
+            for msg in self._msgs:
+                yield msg
+        return gen()
+
+    def exception(self):
+        return RuntimeError("socket blew up")
+
+
+def _collect(msgs):
+    async def run():
+        wc = WebwayClient("http://example.invalid")
+        wc.ws = _FakeWS(msgs)
+        return [event async for event in wc.messages()]
+    return asyncio.run(run())
+
+
+def test_messages_drops_malformed_frames_and_keeps_yielding():
+    text = aiohttp.WSMsgType.TEXT
+    events = _collect([
+        _FakeMsg(text, p.encode({"type": p.S_MESSAGE, "text": "first"})),
+        _FakeMsg(text, "{not json at all"),
+        _FakeMsg(text, '"a bare string, not an object"'),
+        _FakeMsg(text, p.encode({"type": p.S_MESSAGE, "text": "second"})),
+    ])
+    assert [e["text"] for e in events] == ["first", "second"]
+
+
+def test_messages_ends_cleanly_on_websocket_error():
+    text = aiohttp.WSMsgType.TEXT
+    events = _collect([
+        _FakeMsg(text, p.encode({"type": p.S_MESSAGE, "text": "first"})),
+        _FakeMsg(aiohttp.WSMsgType.ERROR),
+        _FakeMsg(text, p.encode({"type": p.S_MESSAGE, "text": "never seen"})),
+    ])
+    assert [e["text"] for e in events] == ["first"]
 
 
 def test_backoff_delays_grow_and_cap():

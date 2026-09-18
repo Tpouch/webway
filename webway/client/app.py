@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 
 import aiohttp
 from textual.app import App
@@ -11,6 +12,8 @@ from webway.client.net import WebwayClient, backoff_delays
 from webway.client.screens.login import LoginScreen
 from webway.client.screens.main import MainScreen
 from webway.shared import protocol as p
+
+logger = logging.getLogger("webway.client.app")
 
 
 class WebwayApp(App):
@@ -38,10 +41,16 @@ class WebwayApp(App):
         await self.push_screen(MainScreen(self.client, reply["username"]))
 
     async def reconnect(self) -> WebwayClient:
-        """Reopen the connection with exponential backoff, then re-authenticate."""
+        """Reopen the connection with exponential backoff, then re-authenticate.
+
+        Every failure mode here is retryable: a refused connection, a socket
+        dropped mid-handshake (``StopAsyncIteration`` from the empty message
+        stream), a malformed reply, or an ``auth.error``. None of them may
+        escape, or the caller's receive worker dies for good.
+        """
         async for delay in backoff_delays():
+            new_client = WebwayClient(self.base_url)
             try:
-                new_client = WebwayClient(self.base_url)
                 await new_client.open()
                 await new_client.send({
                     "type": p.C_AUTH, "username": self._username, "password": self._password,
@@ -51,8 +60,17 @@ class WebwayApp(App):
                     new_client.session_token = reply["session_token"]
                     self.client = new_client
                     return new_client
-            except (ConnectionError, OSError, aiohttp.ClientError):
-                pass
+                # Anything else (including auth.error, e.g. the password changed
+                # while we were away) is not a usable connection: keep retrying.
+                logger.warning("reconnect rejected: %s", reply.get("reason", reply["type"]))
+            except (ConnectionError, OSError, aiohttp.ClientError,
+                    StopAsyncIteration, p.ProtocolError) as exc:
+                logger.warning("reconnect attempt failed: %r", exc)
+            # Failed attempts must not leak their aiohttp.ClientSession.
+            try:
+                await new_client.close()
+            except Exception:
+                logger.warning("failed to close abandoned client", exc_info=True)
             await asyncio.sleep(delay)
 
 

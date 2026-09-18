@@ -51,6 +51,99 @@ def test_reconnect_retries_until_open_succeeds(monkeypatch):
     asyncio.run(run())
 
 
+class _DropsMidHandshakeClient:
+    """Opens fine, but the stream ends before the auth reply arrives."""
+
+    attempts = 0
+    closed = 0
+
+    def __init__(self, base_url):
+        self.base_url = base_url
+        self.session_token = None
+
+    async def open(self):
+        _DropsMidHandshakeClient.attempts += 1
+
+    async def close(self):
+        _DropsMidHandshakeClient.closed += 1
+
+    async def send(self, payload):
+        pass
+
+    async def messages(self):
+        if _DropsMidHandshakeClient.attempts < 3:
+            return  # empty stream -> anext() raises StopAsyncIteration
+            yield  # pragma: no cover (unreachable; makes this an async generator)
+        yield {"type": p.S_AUTH_OK, "session_token": "tok3"}
+
+
+def test_reconnect_survives_a_connection_dropped_mid_handshake(monkeypatch):
+    _DropsMidHandshakeClient.attempts = 0
+    _DropsMidHandshakeClient.closed = 0
+    monkeypatch.setattr(app_module, "WebwayClient", _DropsMidHandshakeClient)
+    monkeypatch.setattr(app_module.asyncio, "sleep", _instant_sleep)
+
+    async def run():
+        app = app_module.WebwayApp("http://example.invalid")
+        app._username = "alice"
+        app._password = "secret"
+
+        new_client = await app.reconnect()
+
+        assert _DropsMidHandshakeClient.attempts == 3
+        assert new_client.session_token == "tok3"
+        # Each abandoned attempt released its session.
+        assert _DropsMidHandshakeClient.closed == 2
+
+    asyncio.run(run())
+
+
+class _AuthErrorThenOkClient:
+    """Rejects credentials once, then accepts them."""
+
+    attempts = 0
+    closed = 0
+
+    def __init__(self, base_url):
+        self.base_url = base_url
+        self.session_token = None
+
+    async def open(self):
+        _AuthErrorThenOkClient.attempts += 1
+
+    async def close(self):
+        _AuthErrorThenOkClient.closed += 1
+
+    async def send(self, payload):
+        pass
+
+    async def messages(self):
+        if _AuthErrorThenOkClient.attempts < 2:
+            yield {"type": p.S_AUTH_ERROR, "reason": "bad_credentials"}
+        else:
+            yield {"type": p.S_AUTH_OK, "session_token": "tok4"}
+
+
+def test_reconnect_retries_after_an_auth_error_rather_than_crashing(monkeypatch):
+    _AuthErrorThenOkClient.attempts = 0
+    _AuthErrorThenOkClient.closed = 0
+    monkeypatch.setattr(app_module, "WebwayClient", _AuthErrorThenOkClient)
+    monkeypatch.setattr(app_module.asyncio, "sleep", _instant_sleep)
+
+    async def run():
+        app = app_module.WebwayApp("http://example.invalid")
+        app._username = "alice"
+        app._password = "secret"
+
+        new_client = await app.reconnect()
+
+        assert _AuthErrorThenOkClient.attempts == 2
+        assert new_client.session_token == "tok4"
+        assert _AuthErrorThenOkClient.closed == 1
+
+    asyncio.run(run())
+
+
 def test_listen_reconnects_when_message_stream_ends():
     async def run():
         reconnect_calls = []

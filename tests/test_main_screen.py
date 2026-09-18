@@ -169,6 +169,46 @@ def test_markup_injection_is_escaped():
     run(body())
 
 
+def test_server_error_is_rendered_as_a_system_message():
+    async def body():
+        client = StubClient()
+
+        class Harness(App):
+            def on_mount(self) -> None:
+                self.push_screen(MainScreen(client, "alice"))
+
+        app = Harness()
+        async with app.run_test() as pilot:
+            screen = app.screen
+            await screen._handle_event({"type": p.S_ERROR, "reason": "no_such_channel"})
+            await pilot.pause()
+
+            widget = screen.query_one(ChatLog)._message_widgets.get(-1)
+            assert widget is not None
+            assert "system: error: no_such_channel" in str(widget.content)
+    run(body())
+
+
+def test_server_error_without_a_reason_still_renders():
+    async def body():
+        client = StubClient()
+
+        class Harness(App):
+            def on_mount(self) -> None:
+                self.push_screen(MainScreen(client, "alice"))
+
+        app = Harness()
+        async with app.run_test() as pilot:
+            screen = app.screen
+            await screen._handle_event({"type": p.S_ERROR})
+            await pilot.pause()
+
+            widget = screen.query_one(ChatLog)._message_widgets.get(-1)
+            assert widget is not None
+            assert "error: unknown" in str(widget.content)
+    run(body())
+
+
 def test_create_channel_sends_channel_create_with_topic():
     async def body():
         client = StubClient()

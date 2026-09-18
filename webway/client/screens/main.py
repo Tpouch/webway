@@ -72,6 +72,11 @@ class MainScreen(Screen):
             self.query_one(ChatLog).add_reaction(event["message_id"], event["emoji"], event["username"])
         elif etype == p.S_PRESENCE and event["channel_id"] == self.current_channel_id:
             self.query_one(MemberList).update_members(event["users"])
+        elif etype == p.S_ERROR:
+            self.query_one(ChatLog).add_message({
+                "id": -1, "username": "system", "message_type": "msg",
+                "text": f"error: {event.get('reason', 'unknown')}", "file": None,
+            })
 
     async def join_channel(self, channel_id: int) -> None:
         self.current_channel_id = channel_id

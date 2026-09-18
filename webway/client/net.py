@@ -1,11 +1,14 @@
 """Async transport wrapper: WebSocket for events, HTTP for file transfer."""
 from __future__ import annotations
 
+import logging
 import os
 
 import aiohttp
 
 from webway.shared import protocol
+
+logger = logging.getLogger("webway.client.net")
 
 
 class WebwayClient:
@@ -30,8 +33,18 @@ class WebwayClient:
 
     async def messages(self):
         async for msg in self.ws:
-            if msg.type == aiohttp.WSMsgType.TEXT:
-                yield protocol.decode(msg.data)
+            if msg.type == aiohttp.WSMsgType.ERROR:
+                logger.warning("websocket error, ending message stream: %s", self.ws.exception())
+                break
+            if msg.type != aiohttp.WSMsgType.TEXT:
+                continue
+            try:
+                payload = protocol.decode(msg.data)
+            except protocol.ProtocolError as exc:
+                # Match the server's posture: drop the bad frame, stay connected.
+                logger.warning("dropped malformed frame: %s", exc)
+                continue
+            yield payload
 
     async def upload_file(self, path: str) -> dict:
         data = aiohttp.FormData()
