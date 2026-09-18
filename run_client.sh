@@ -10,4 +10,4 @@ source .venv/bin/activate
 pip install -q --upgrade pip
 pip install -q -r requirements.txt
 
-python3 client.py "$@"
+python3 -m webway.client "$@"

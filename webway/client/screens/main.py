@@ -1,6 +1,8 @@
 """Main chat screen: channel list, chat log, member list, input box."""
 from __future__ import annotations
 
+import os
+
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
@@ -10,6 +12,9 @@ from webway.client.widgets.channel_list import ChannelList
 from webway.client.widgets.chat_log import ChatLog
 from webway.client.widgets.member_list import MemberList
 from webway.shared import protocol as p
+
+CACHE_DIR = os.path.expanduser("~/.cache/webway")
+MAX_UPLOAD_SIZE = 15 * 1024 * 1024  # must match webway.server.files.MAX_UPLOAD_SIZE
 
 
 class MainScreen(Screen):
@@ -48,8 +53,11 @@ class MainScreen(Screen):
             self.query_one(ChannelList).add_channel(event["id"], event["name"])
         elif etype == p.S_HISTORY and event["channel_id"] == self.current_channel_id:
             self.query_one(ChatLog).load_history(event["items"])
+            for item in event["items"]:
+                self._maybe_render_file(item["id"], item.get("file"))
         elif etype == p.S_MESSAGE and event["channel_id"] == self.current_channel_id:
             self.query_one(ChatLog).add_message(event)
+            self._maybe_render_file(event["id"], event.get("file"))
         elif etype == p.S_TYPING and event["channel_id"] == self.current_channel_id:
             self.query_one(ChatLog).set_typing(event["username"], event["state"])
         elif etype == p.S_REACTION:
@@ -80,6 +88,38 @@ class MainScreen(Screen):
             return
         if self.current_channel_id is None:
             return
+        if text.startswith("/upload "):
+            path = text[len("/upload "):].strip()
+            if not os.path.exists(path):
+                self.query_one(ChatLog).add_message({
+                    "id": -1, "username": "system", "message_type": "msg",
+                    "text": f"file not found: {path}", "file": None,
+                })
+                return
+            if os.path.getsize(path) > MAX_UPLOAD_SIZE:
+                self.query_one(ChatLog).add_message({
+                    "id": -1, "username": "system", "message_type": "msg",
+                    "text": f"file too large (max {MAX_UPLOAD_SIZE // (1024 * 1024)}MB): {path}",
+                    "file": None,
+                })
+                return
+            result = await self.client.upload_file(path)
+            await self.client.send({
+                "type": p.C_MESSAGE_SEND, "channel_id": self.current_channel_id,
+                "text": os.path.basename(path), "file_id": result["file_id"],
+            })
+            return
         await self.client.send({
             "type": p.C_MESSAGE_SEND, "channel_id": self.current_channel_id, "text": text,
         })
+
+    def _maybe_render_file(self, message_id: int, file_meta: dict | None) -> None:
+        if file_meta and file_meta["mime"].startswith("image/"):
+            self.run_worker(self._download_and_show(message_id, file_meta), exclusive=False)
+
+    async def _download_and_show(self, message_id: int, file_meta: dict) -> None:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        cache_path = os.path.join(CACHE_DIR, f"{file_meta['id']}_{file_meta['filename']}")
+        if not os.path.exists(cache_path):
+            await self.client.download_file(file_meta["id"], cache_path)
+        self.query_one(ChatLog).mount_image(message_id, cache_path)
