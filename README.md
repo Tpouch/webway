@@ -1,96 +1,76 @@
 # webway
 
-Un chat de terminal sur TCP/IP, avec une TUI curses **animée** : écran d'accueil, particules,
-pluie Matrix, indicateurs de frappe en direct, réactions et thèmes de couleurs.
+A multi-channel terminal chat application with a modern Textual TUI. Connect via TCP/IP, authenticate with username and password, join channels, share files, and view inline images on supported terminals.
 
-Aucune dépendance externe — bibliothèque standard Python uniquement.
+## Running
 
-## Utilisation
+**Start the server:**
 
-Lancer le serveur (sur la machine hôte) :
-
-```
+```bash
 ./run_server.sh [port]
 ```
 
-Le port par défaut est `5555`.
+The default port is `5555`. The server creates a SQLite database and file upload directory on startup.
 
-Se connecter en tant que client (sur chaque machine) :
+**Connect a client:**
 
-```
-./run_client.sh <ip-serveur> <port> <ton-pseudo>
-```
-
-Exemple :
-
-```
-./run_client.sh 192.168.1.42 5555 Alice
+```bash
+./run_client.sh <server-ip> <port>
 ```
 
-Les deux scripts créent un `.venv`, installent `requirements.txt` et lancent l'application.
+Example:
 
-## Animations
+```bash
+./run_client.sh 192.168.1.42 5555
+```
 
-- **Écran d'accueil** : logo ASCII révélé lettre par lettre en arc-en-ciel, barre d'onde et
-  confettis pendant que la connexion s'établit (une touche pour passer).
-- **Rendu continu à 30 fps** : tout bouge en permanence, même sans nouveau message.
-- **Arrivée des messages** : glissement horizontal, flash, et liseré coloré qui s'estompe.
-- **Confettis et feux d'artifice** : particules avec gravité, par-dessus toute l'interface.
-- **Pluie Matrix** : colonnes de caractères en fond du panneau de chat (`F2`).
-- **Mode arc-en-ciel** : tes propres messages défilent en dégradé animé (`F3`).
-- **Indicateur de frappe** : « Bob tape... » animé sur la bordure du chat, et un `✎` qui pulse
-  à côté de son pseudo dans la liste des participants.
-- **Toasts** : notifications glissantes en haut à droite (arrivées, départs, mentions).
-- **Flash de mention** : le cadre de l'écran clignote et le terminal bipe quand ton pseudo
-  est cité.
-- **Sparkline d'activité** : histogramme animé des messages des 20 dernières secondes.
-- **En-tête vivant** : titre arc-en-ciel, spinner, latence réseau mesurée en direct, horloge.
-- **Défilement fluide** : le scroll est interpolé, pas saccadé.
-- **Nouveaux venus** : leur pseudo clignote quelques secondes dans la liste.
+Both scripts create a `.venv`, install dependencies from `requirements.txt`, and launch the application.
 
-## Fonctionnalités
+## Authentication
 
-- Historique rejoué : un client qui arrive reçoit les 200 derniers évènements du salon.
-- Réactions sur le dernier message (`F5`..`F8` → ★ ♥ ☺ ⚡), diffusées à tout le monde.
-- Latence affichée en continu (ping/pong applicatif).
-- 5 thèmes de couleurs (`Ctrl+T`), couleur personnelle synchronisée (`Ctrl+K`).
-- Édition de ligne complète : curseur, mots, historique de saisie, complétion de pseudo.
-- Un bot serveur qui répond quand on écrit `@bot`.
-- Statistiques du serveur à la demande (`/stats`).
+When you first launch the client, you'll be prompted for a username and password.
 
-## Raccourcis
+- **First login:** Using a new username with any password creates that account.
+- **Subsequent logins:** You must use the same password that was set on first login with that username.
 
-| Touche | Effet |
-| --- | --- |
-| `Entrée` | Envoyer le message |
-| `Tab` | Compléter un pseudo |
-| `↑` / `↓` | Rappeler un message envoyé |
-| `←` `→` `Home` `End` | Déplacer le curseur |
-| `Ctrl+W` / `Ctrl+U` | Effacer le mot précédent / la ligne |
-| `PgUp` / `PgDn` | Défiler l'historique |
-| `Ctrl+K` | Changer de couleur (visible par tous) |
-| `Ctrl+T` | Thème suivant |
-| `F1` | Panneau d'aide |
-| `F2` | Pluie Matrix |
-| `F3` | Mode arc-en-ciel |
-| `F4` | Confettis |
-| `F5`..`F8` | Réagir au dernier message (★ ♥ ☺ ⚡) |
-| `Ctrl+C` | Quitter |
+## Using the Client
 
-## Commandes
+### Switching Channels
+
+Use the `/join` command to switch to an existing channel:
 
 ```
-/me <texte>      action à la troisième personne
-/confetti        lâcher de confettis
-/fireworks       feu d'artifice
-/matrix          pluie Matrix on/off
-/rainbow         tes messages en arc-en-ciel
-/theme           thème de couleurs suivant
-/roll [NdM]      lancer de dés (défaut 1d6)
-/flip            pile ou face
-/shrug           ¯\_(ツ)_/¯
-/users           qui est connecté
-/stats           statistiques du serveur
-/clear           vider l'affichage local
-/quit            quitter
+/join general
+/join random
 ```
+
+The channel list appears in the left sidebar. Click or use `/join` to switch channels.
+
+### Sharing Files
+
+Use the `/upload` command to share a file with the current channel:
+
+```
+/upload /path/to/file.txt
+/upload ~/Pictures/screenshot.png
+```
+
+**Image handling:** Images (JPG, PNG, GIF, etc.) automatically render inline in the chat on terminals with graphics protocol support (via `textual-image`). On terminals without graphics support, images display as a text notice with a download link.
+
+**File size limit:** 15 MB per file.
+
+## Architecture
+
+- **Server:** aiohttp-based WebSocket server with SQLite persistence. Handles authentication, channel management, message history, file uploads, and presence tracking.
+- **Client:** Textual TUI application. Displays channels, chat messages, member list, and supports real-time typing indicators and reactions.
+- **Protocol:** JSON-based WebSocket protocol for client-server communication.
+
+## Feature Summary
+
+- **Multi-channel chat:** Create and join multiple channels.
+- **Accounts:** Username/password authentication. First login with a username creates the account.
+- **Presence:** See who's online in each channel.
+- **File sharing:** Upload and download files; images render inline when supported.
+- **Message history:** 50 recent messages per channel are replayed when you join.
+- **Typing indicators:** See when others are typing.
+- **Reactions:** Add emoji reactions to messages.
