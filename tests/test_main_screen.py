@@ -10,6 +10,19 @@ from webway.client.widgets.member_list import MemberList
 from webway.shared import protocol as p
 
 
+class BlockingClient:
+    """Mock client with blocking message stream to prevent reconnect loop."""
+    async def send(self, payload):
+        pass
+    async def messages(self):
+        # Never yield - block indefinitely waiting for an event that never comes
+        # This makes it an async generator that never yields
+        while True:
+            await asyncio.sleep(100)
+            if False:
+                yield {}  # pragma: no cover - unreachable, but makes this an async generator
+
+
 class StubClient:
     def __init__(self):
         self.sent: list[dict] = []
@@ -34,6 +47,10 @@ def test_join_channel_switches_current_channel_and_sends_join():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
+            async def reconnect(self):
+                # Stub for reconnect - return a client that blocks
+                return BlockingClient()
+
         app = Harness()
         async with app.run_test() as pilot:
             screen = app.screen
@@ -54,6 +71,9 @@ def test_plain_text_sends_message_to_current_channel():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
+            async def reconnect(self):
+                return BlockingClient()
+
         app = Harness()
         async with app.run_test() as pilot:
             screen = app.screen
@@ -72,6 +92,9 @@ def test_history_event_populates_chat_log():
         class Harness(App):
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
+
+            async def reconnect(self):
+                return BlockingClient()
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -96,6 +119,9 @@ def test_presence_event_updates_member_list():
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
 
+            async def reconnect(self):
+                return BlockingClient()
+
         app = Harness()
         async with app.run_test() as pilot:
             screen = app.screen
@@ -115,6 +141,9 @@ def test_add_reaction_works_without_crash():
         class Harness(App):
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
+
+            async def reconnect(self):
+                return BlockingClient()
 
         app = Harness()
         async with app.run_test() as pilot:
@@ -140,6 +169,9 @@ def test_markup_injection_is_escaped():
         class Harness(App):
             def on_mount(self) -> None:
                 self.push_screen(MainScreen(client, "alice"))
+
+            async def reconnect(self):
+                return BlockingClient()
 
         app = Harness()
         async with app.run_test() as pilot:

@@ -1,6 +1,7 @@
 """Main chat screen: channel list, chat log, member list, input box."""
 from __future__ import annotations
 
+import asyncio
 import os
 
 from textual.app import ComposeResult
@@ -42,8 +43,15 @@ class MainScreen(Screen):
         self.run_worker(self.client.send({"type": p.C_CHANNEL_LIST}))
 
     async def _listen(self) -> None:
-        async for event in self.client.messages():
-            await self._handle_event(event)
+        while True:
+            async for event in self.client.messages():
+                await self._handle_event(event)
+            new_client = await self.app.reconnect()
+            self.client = new_client
+            if self.current_channel_id is not None:
+                await self.client.send({
+                    "type": p.C_CHANNEL_JOIN, "channel_id": self.current_channel_id,
+                })
 
     async def _handle_event(self, event: dict) -> None:
         etype = event["type"]

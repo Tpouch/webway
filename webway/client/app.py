@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 
+import aiohttp
 from textual.app import App
 
-from webway.client.net import WebwayClient
+from webway.client.net import WebwayClient, backoff_delays
 from webway.client.screens.login import LoginScreen
 from webway.client.screens.main import MainScreen
 from webway.shared import protocol as p
@@ -16,6 +18,8 @@ class WebwayApp(App):
         super().__init__()
         self.base_url = base_url
         self.client = WebwayClient(base_url)
+        self._username: str | None = None
+        self._password: str | None = None
 
     def on_mount(self) -> None:
         self.push_screen(LoginScreen(self._handle_login))
@@ -28,8 +32,28 @@ class WebwayApp(App):
         if reply["type"] == p.S_AUTH_ERROR:
             self.screen.show_error(reply["reason"])
             return
+        self._username = username
+        self._password = password
         self.client.session_token = reply["session_token"]
         await self.push_screen(MainScreen(self.client, reply["username"]))
+
+    async def reconnect(self) -> WebwayClient:
+        """Reopen the connection with exponential backoff, then re-authenticate."""
+        async for delay in backoff_delays():
+            try:
+                new_client = WebwayClient(self.base_url)
+                await new_client.open()
+                await new_client.send({
+                    "type": p.C_AUTH, "username": self._username, "password": self._password,
+                })
+                reply = await anext(new_client.messages())
+                if reply["type"] == p.S_AUTH_OK:
+                    new_client.session_token = reply["session_token"]
+                    self.client = new_client
+                    return new_client
+            except (ConnectionError, OSError, aiohttp.ClientError):
+                pass
+            await asyncio.sleep(delay)
 
 
 def main() -> None:
