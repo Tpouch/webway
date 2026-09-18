@@ -204,4 +204,3 @@ def test_create_channel_without_topic_defaults_empty():
 
             assert client.sent[-1] == {"type": p.C_CHANNEL_CREATE, "name": "random", "topic": ""}
     run(body())
-    run(body())
