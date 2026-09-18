@@ -166,4 +166,42 @@ def test_markup_injection_is_escaped():
             # The escaped markup should appear as literal text, not be interpreted
             assert r"\[bold]" in widget.content
             assert r"\[link=" in widget.content
+
+
+def test_create_channel_sends_channel_create_with_topic():
+    async def body():
+        client = StubClient()
+
+        class Harness(App):
+            def on_mount(self) -> None:
+                self.push_screen(MainScreen(client, "alice"))
+
+        app = Harness()
+        async with app.run_test() as pilot:
+            screen = app.screen
+            await screen.handle_input("/create general a place to chat")
+            await pilot.pause()
+
+            assert client.sent[-1] == {
+                "type": p.C_CHANNEL_CREATE, "name": "general", "topic": "a place to chat",
+            }
+    run(body())
+
+
+def test_create_channel_without_topic_defaults_empty():
+    async def body():
+        client = StubClient()
+
+        class Harness(App):
+            def on_mount(self) -> None:
+                self.push_screen(MainScreen(client, "alice"))
+
+        app = Harness()
+        async with app.run_test() as pilot:
+            screen = app.screen
+            await screen.handle_input("/create random")
+            await pilot.pause()
+
+            assert client.sent[-1] == {"type": p.C_CHANNEL_CREATE, "name": "random", "topic": ""}
+    run(body())
     run(body())

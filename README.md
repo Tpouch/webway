@@ -44,6 +44,16 @@ Use the `/join` command to switch to an existing channel:
 /join random
 ```
 
+### Creating Channels
+
+Use the `/create` command to create a new channel:
+
+```
+/create general
+/create random a place for off-topic discussion
+```
+
+The channel name is required; the topic is optional and defaults to empty.
 
 ### Sharing Files
 

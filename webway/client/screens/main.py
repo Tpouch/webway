@@ -94,6 +94,15 @@ class MainScreen(Screen):
             if channel_id is not None:
                 await self.join_channel(channel_id)
             return
+        if text.startswith("/create "):
+            rest = text[len("/create "):].strip()
+            if not rest:
+                return
+            parts = rest.split(maxsplit=1)
+            name = parts[0]
+            topic = parts[1] if len(parts) > 1 else ""
+            await self.client.send({"type": p.C_CHANNEL_CREATE, "name": name, "topic": topic})
+            return
         if self.current_channel_id is None:
             return
         if text.startswith("/upload "):
