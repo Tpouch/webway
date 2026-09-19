@@ -37,7 +37,7 @@ When you first launch the client, you'll be prompted for a username and password
 
 ### Switching Channels
 
-Use the `/join` command to switch to an existing channel:
+A `#general` channel exists by default on every fresh server, so there's always somewhere to join. Use the `/join` command to switch to an existing channel:
 
 ```
 /join general
@@ -49,7 +49,6 @@ Use the `/join` command to switch to an existing channel:
 Use the `/create` command to create a new channel:
 
 ```
-/create general
 /create random a place for off-topic discussion
 ```
 

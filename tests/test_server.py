@@ -4,7 +4,7 @@ import os
 import sqlite3
 import tempfile
 
-from aiohttp.test_utils import AioHTTPTestCase
+from aiohttp.test_utils import AioHTTPTestCase, TestServer
 from aiohttp import web
 
 from webway.server.app import create_app
@@ -29,6 +29,25 @@ class ServerTestCase(AioHTTPTestCase):
             if payload["type"] == msg_type:
                 return payload
 
+    async def test_fresh_server_has_a_default_general_channel(self):
+        async with self.client.ws_connect("/ws") as ws:
+            await self._auth(ws, "alice")
+            reply = await self._receive_until(ws, p.S_CHANNEL_LIST)
+            names = [c["name"] for c in reply["channels"]]
+            self.assertIn("general", names)
+
+    async def test_default_channel_is_not_duplicated_on_restart(self):
+        db_path = os.path.join(self.tmpdir, "test.db")
+        restarted = create_app(db_path, os.path.join(self.tmpdir, "uploads"))
+        server = TestServer(restarted)
+        await server.start_server()
+        try:
+            channels = await restarted[DB_KEY].list_channels()
+            names = [c["name"] for c in channels]
+            self.assertEqual(names.count("general"), 1)
+        finally:
+            await server.close()
+
     async def test_auth_creates_account_on_first_use(self):
         async with self.client.ws_connect("/ws") as ws:
             reply = await self._auth(ws, "alice")
@@ -49,7 +68,7 @@ class ServerTestCase(AioHTTPTestCase):
             await self._auth(ws2, "bob")
             await self._receive_until(ws2, p.S_CHANNEL_LIST)
 
-            await ws1.send_str(p.encode({"type": p.C_CHANNEL_CREATE, "name": "general", "topic": "chat"}))
+            await ws1.send_str(p.encode({"type": p.C_CHANNEL_CREATE, "name": "testroom", "topic": "chat"}))
             created = await self._receive_until(ws1, p.S_CHANNEL_CREATED)
             await self._receive_until(ws2, p.S_CHANNEL_CREATED)
             channel_id = created["id"]
@@ -75,7 +94,7 @@ class ServerTestCase(AioHTTPTestCase):
             await self._auth(ws2, "bob")
             await self._receive_until(ws2, p.S_CHANNEL_LIST)
 
-            await ws1.send_str(p.encode({"type": p.C_CHANNEL_CREATE, "name": "general", "topic": ""}))
+            await ws1.send_str(p.encode({"type": p.C_CHANNEL_CREATE, "name": "testroom", "topic": ""}))
             created = await self._receive_until(ws1, p.S_CHANNEL_CREATED)
             await self._receive_until(ws2, p.S_CHANNEL_CREATED)
             channel_id = created["id"]
@@ -100,7 +119,7 @@ class ServerTestCase(AioHTTPTestCase):
             self.assertEqual(reply["type"], p.S_ERROR)
             self.assertEqual(reply["reason"], "not_authenticated")
 
-    async def _setup_channel(self, ws, name="general"):
+    async def _setup_channel(self, ws, name="testroom"):
         """Authenticate, create a channel, join it. Returns the channel id."""
         await self._receive_until(ws, p.S_CHANNEL_LIST)
         await ws.send_str(p.encode({"type": p.C_CHANNEL_CREATE, "name": name, "topic": ""}))

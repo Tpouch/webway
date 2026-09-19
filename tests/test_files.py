@@ -48,7 +48,7 @@ class FilesTestCase(AioHTTPTestCase):
         token = json.loads(await ws.receive_str())["session_token"]
         json.loads(await ws.receive_str())  # channel list
 
-        await ws.send_str(p.encode({"type": p.C_CHANNEL_CREATE, "name": "general", "topic": ""}))
+        await ws.send_str(p.encode({"type": p.C_CHANNEL_CREATE, "name": "testroom", "topic": ""}))
         channel_id = json.loads(await ws.receive_str())["id"]
         await ws.send_str(p.encode({"type": p.C_CHANNEL_JOIN, "channel_id": channel_id}))
         while json.loads(await ws.receive_str())["type"] != p.S_HISTORY:
