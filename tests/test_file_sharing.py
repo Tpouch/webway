@@ -122,7 +122,7 @@ def test_file_indicator_uses_parens_and_is_visible():
             assert widget is not None
             # Square brackets are Rich markup and would silently swallow this
             # substring; parens require no escaping and render as literal text.
-            assert "(file: cat.png)" in widget.content
+            assert "(fichier : cat.png)" in widget.content
     run(body())
 
 
@@ -145,14 +145,14 @@ def test_missing_file_notice_does_not_double_escape_bracket_in_path():
             chat_log = screen.query_one(ChatLog)
             widget = chat_log._message_widgets.get(-1)
             assert widget is not None
-            # widget.content is the raw Rich markup source (escape sequences
-            # intact, not yet rendered). ChatLog._render_line already escapes
-            # the whole text field once, so the bracket should appear
-            # singly-escaped ("\[") here. Pre-escaping the path too would
-            # double-escape it to "\\\[", leaving a visible stray backslash
-            # once Rich renders the markup.
-            assert "weird\\[name].png" in widget.content
-            assert "\\\\[" not in widget.content
+            # widget.content is a Rich Text object: markup has already been
+            # resolved, so an escaped "\[" renders back to a literal "[".
+            # ChatLog._render_line escapes the whole text field once; if the
+            # path were pre-escaped too, the bracket would double-escape and
+            # a stray backslash would leak into the rendered text.
+            content = str(widget.content)
+            assert "/no/such/weird[name].png" in content
+            assert "\\" not in content
     run(body())
 
 

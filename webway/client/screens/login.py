@@ -16,10 +16,10 @@ class LoginScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Vertical(
-            Label("webway", id="login-title"),
-            Input(placeholder="username", id="username"),
-            Input(placeholder="password", password=True, id="password"),
-            Button("Connect", id="connect", variant="primary"),
+            Label("WEBWAY", id="login-title"),
+            Input(placeholder="nom d'utilisateur", id="username"),
+            Input(placeholder="mot de passe", password=True, id="password"),
+            Button("Connexion", id="connect", variant="primary"),
             Label("", id="login-error"),
             id="login-form",
         )
@@ -30,9 +30,9 @@ class LoginScreen(Screen):
         username = self.query_one("#username", Input).value.strip()
         password = self.query_one("#password", Input).value
         if not username or not password:
-            self.show_error("username and password are required")
+            self.show_error("nom d'utilisateur et mot de passe requis")
             return
         await self._on_submit(username, password)
 
     def show_error(self, reason: str) -> None:
-        self.query_one("#login-error", Label).update(f"Error: {reason}")
+        self.query_one("#login-error", Label).update(f"Erreur : {reason}")

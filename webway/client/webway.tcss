@@ -1,0 +1,73 @@
+/* Retro-terminal styling: heavy borders, boxed panels, prompt-style input. */
+
+Screen {
+    background: $background;
+}
+
+/* --- Login screen --- */
+
+#login-form {
+    width: 44;
+    height: auto;
+    border: heavy $primary;
+    padding: 1 2;
+    align: center middle;
+    background: $surface;
+}
+
+#login-title {
+    width: 100%;
+    content-align: center middle;
+    text-style: bold;
+    color: $primary;
+    padding-bottom: 1;
+}
+
+#username, #password {
+    margin-bottom: 1;
+    border: round $primary;
+}
+
+#connect {
+    width: 100%;
+    margin-bottom: 1;
+}
+
+#login-error {
+    color: $error;
+    text-style: bold;
+}
+
+/* --- Main screen --- */
+
+ChannelList {
+    width: 24;
+    border: heavy $primary;
+    border-title-color: $primary;
+    border-title-style: bold;
+    background: $surface;
+}
+
+MemberList {
+    width: 22;
+    border: heavy $primary;
+    border-title-color: $primary;
+    border-title-style: bold;
+    background: $surface;
+}
+
+#chat-pane {
+    border: heavy $primary;
+    border-title-color: $primary;
+    border-title-style: bold;
+}
+
+ChatLog {
+    background: $background;
+    padding: 0 1;
+}
+
+#message-input {
+    border: round $primary;
+    background: $surface;
+}

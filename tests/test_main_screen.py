@@ -163,9 +163,17 @@ def test_markup_injection_is_escaped():
 
             widget = chat_log._message_widgets.get(1)
             assert widget is not None
-            # The escaped markup should appear as literal text, not be interpreted
-            assert r"\[bold]" in widget.content
-            assert r"\[link=" in widget.content
+            # widget.content is a Rich Text object with markup already
+            # resolved. If the injected tags had been interpreted as real
+            # style directives, the bracket characters would have been
+            # consumed and would NOT appear in the rendered text. Their
+            # literal presence here proves they rendered as inert text.
+            content = str(widget.content)
+            assert "[bold]hacker[/bold]" in content
+            assert "[link=file:///etc/passwd]click[/link]" in content
+            # And no span actually carries a "bold" or "link" style.
+            styles = [str(span.style) for span in widget.content.spans]
+            assert not any("bold" in style or "link" in style for style in styles)
     run(body())
 
 
@@ -185,7 +193,9 @@ def test_server_error_is_rendered_as_a_system_message():
 
             widget = screen.query_one(ChatLog)._message_widgets.get(-1)
             assert widget is not None
-            assert "system: error: no_such_channel" in str(widget.content)
+            content = str(widget.content)
+            assert "system" in content
+            assert "erreur : no_such_channel" in content
     run(body())
 
 
@@ -205,7 +215,7 @@ def test_server_error_without_a_reason_still_renders():
 
             widget = screen.query_one(ChatLog)._message_widgets.get(-1)
             assert widget is not None
-            assert "error: unknown" in str(widget.content)
+            assert "erreur : inconnue" in str(widget.content)
     run(body())
 
 

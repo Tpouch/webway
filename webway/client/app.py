@@ -7,22 +7,33 @@ import logging
 
 import aiohttp
 from textual.app import App
+from textual.binding import Binding
 
 from webway.client.net import WebwayClient, backoff_delays
 from webway.client.screens.login import LoginScreen
 from webway.client.screens.main import MainScreen
+from webway.client.theme import PHOSPHOR_GREEN, THEMES, next_theme_name
 from webway.shared import protocol as p
 
 logger = logging.getLogger("webway.client.app")
 
 
 class WebwayApp(App):
+    CSS_PATH = "webway.tcss"
+    BINDINGS = [Binding("ctrl+t", "cycle_theme", "Thème suivant", show=True)]
+
     def __init__(self, base_url: str):
         super().__init__()
         self.base_url = base_url
         self.client = WebwayClient(base_url)
         self._username: str | None = None
         self._password: str | None = None
+        for theme in THEMES:
+            self.register_theme(theme)
+        self.theme = PHOSPHOR_GREEN.name
+
+    def action_cycle_theme(self) -> None:
+        self.theme = next_theme_name(self.theme)
 
     def on_mount(self) -> None:
         self.push_screen(LoginScreen(self._handle_login))

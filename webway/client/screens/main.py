@@ -27,15 +27,17 @@ class MainScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Horizontal(
-            ChannelList(id="channel-list"),
-            Vertical(
-                ChatLog(id="chat-log"),
-                Input(placeholder="Message... (/join <name> to switch channel)", id="message-input"),
-                id="chat-pane",
-            ),
-            MemberList(id="member-list"),
+        channel_list = ChannelList(id="channel-list")
+        channel_list.border_title = "CANAUX"
+        member_list = MemberList(id="member-list")
+        member_list.border_title = "MEMBRES"
+        chat_pane = Vertical(
+            ChatLog(id="chat-log"),
+            Input(placeholder="> message... (/join <nom> pour changer de canal)", id="message-input"),
+            id="chat-pane",
         )
+        chat_pane.border_title = "MESSAGES"
+        yield Horizontal(channel_list, chat_pane, member_list)
         yield Footer()
 
     def on_mount(self) -> None:
@@ -75,7 +77,7 @@ class MainScreen(Screen):
         elif etype == p.S_ERROR:
             self.query_one(ChatLog).add_message({
                 "id": -1, "username": "system", "message_type": "msg",
-                "text": f"error: {event.get('reason', 'unknown')}", "file": None,
+                "text": f"erreur : {event.get('reason', 'inconnue')}", "file": None,
             })
 
     async def join_channel(self, channel_id: int) -> None:
@@ -115,13 +117,13 @@ class MainScreen(Screen):
             if not os.path.exists(path):
                 self.query_one(ChatLog).add_message({
                     "id": -1, "username": "system", "message_type": "msg",
-                    "text": f"file not found: {path}", "file": None,
+                    "text": f"fichier introuvable : {path}", "file": None,
                 })
                 return
             if os.path.getsize(path) > MAX_UPLOAD_SIZE:
                 self.query_one(ChatLog).add_message({
                     "id": -1, "username": "system", "message_type": "msg",
-                    "text": f"file too large (max {MAX_UPLOAD_SIZE // (1024 * 1024)}MB): {path}",
+                    "text": f"fichier trop volumineux (max {MAX_UPLOAD_SIZE // (1024 * 1024)}Mo) : {path}",
                     "file": None,
                 })
                 return
@@ -129,7 +131,7 @@ class MainScreen(Screen):
             if "file_id" not in result:
                 self.query_one(ChatLog).add_message({
                     "id": -1, "username": "system", "message_type": "msg",
-                    "text": f"upload failed: {result.get('reason', 'unknown error')}", "file": None,
+                    "text": f"échec de l'envoi : {result.get('reason', 'erreur inconnue')}", "file": None,
                 })
                 return
             await self.client.send({
